@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 340px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: #12131a;
+    color: #e4e4e8;
+    padding: 20px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .header h1 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .header h1 span { color: #e8533e; }
+
+  label {
+    display: block;
+    font-size: 0.72rem;
+    color: #8b8d9a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  input[type="password"] {
+    width: 100%;
+    padding: 9px 12px;
+    background: #1a1c25;
+    border: 1px solid #2e3140;
+    border-radius: 7px;
+    color: #e4e4e8;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: #e8533e; }
+  input::placeholder { color: #555; }
+
+  .save-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 9px;
+    background: #e8533e;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+  .save-btn:hover { filter: brightness(1.1); }
+
+  .status {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    text-align: center;
+    min-height: 20px;
+    transition: opacity 0.3s;
+  }
+  .status.success { color: #5dba7d; }
+  .status.info { color: #8b8d9a; }
+
+  .toggle-row {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #2e3140;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .toggle-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+  }
+
+  .toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: #2e3140;
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle .slider::before {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    left: 3px; top: 3px;
+    background: #888;
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+  .toggle input:checked + .slider { background: #e8533e; }
+  .toggle input:checked + .slider::before { transform: translateX(18px); background: #fff; }
+
+  .hint {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #2e3140;
+    font-size: 0.75rem;
+    color: #6b6d7a;
+    line-height: 1.6;
+  }
+
+  .cache-section {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #2e3140;
+  }
+  .cache-stats {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .cache-stat {
+    flex: 1;
+    background: #1a1c25;
+    border: 1px solid #2e3140;
+    border-radius: 7px;
+    padding: 8px;
+    text-align: center;
+  }
+  .cache-stat-num {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #f0c36d;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .cache-stat-label {
+    font-size: 0.65rem;
+    color: #6b6d7a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+  .clear-btn {
+    width: 100%;
+    padding: 7px;
+    background: transparent;
+    color: #8b8d9a;
+    border: 1px solid #2e3140;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .clear-btn:hover {
+    color: #e8533e;
+    border-color: #e8533e;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>汉字 <span>→</span> English</h1>
+</div>
+
+<label>Anthropic API Key</label>
+<input type="password" id="apiKey" placeholder="sk-ant-api03-..." />
+<button class="save-btn" id="saveBtn">Save Key</button>
+<div class="status" id="status"></div>
+
+<div class="toggle-row">
+  <span class="toggle-label">Active</span>
+  <label class="toggle">
+    <input type="checkbox" id="activeToggle" checked>
+    <span class="slider"></span>
+  </label>
+</div>
+
+<div class="cache-section">
+  <div class="cache-stats">
+    <div class="cache-stat">
+      <div class="cache-stat-num" id="wordCount">0</div>
+      <div class="cache-stat-label">words</div>
+    </div>
+    <div class="cache-stat">
+      <div class="cache-stat-num" id="phraseCount">0</div>
+      <div class="cache-stat-label">phrases</div>
+    </div>
+  </div>
+  <button class="clear-btn" id="clearBtn">Clear cache</button>
+</div>
+
+<div class="hint">
+  Highlight Chinese text on any page. Translated phrases get a red underline with a tab at the top-left — click the tab to reopen the phrase card. Individual words inside get a yellow highlight — click any word for its card. Gap-severity dots flag words whose meaning doesn't map cleanly to English; click amber or red cards to expand the explanation.<br><br>
+  Ctrl+Shift+T to toggle on/off.
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

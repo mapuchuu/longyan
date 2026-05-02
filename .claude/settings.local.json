@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc *)",
+      "Bash(node --check \"C:\\\\Users\\\\Matthew\\\\Desktop\\\\Longyan\\\\modernly\\\\content.js\")"
+    ]
+  }
+}

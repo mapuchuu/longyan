@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "汉字 → English",
+  "version": "2.0",
+  "description": "Highlight Chinese text on any page to get word-by-word pinyin and translations",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "host_permissions": [
+    "https://api.anthropic.com/*"
+  ]
+}

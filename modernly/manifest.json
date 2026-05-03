@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Longyan",
-  "version": "2.0",
-  "description": "Highlight Chinese text on any page to get word by word pinyin and translations",
+  "version": "1.0",
+  "description": "Read Chinese anywhere. Understand what it actually means.",
   "permissions": ["storage", "windows"],
   "action": {
     "default_popup": "popup.html",

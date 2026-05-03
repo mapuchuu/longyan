@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #fff;
+    color: #111;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 18px 20px 12px;
+    border-bottom: 0.5px solid rgba(0,0,0,0.1);
+    flex-shrink: 0;
+  }
+  .header-title {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #111;
+  }
+  .header-count {
+    font-size: 12px;
+    color: #aaa;
+  }
+
+  .tabs {
+    display: flex;
+    padding: 0 20px;
+    border-bottom: 0.5px solid rgba(0,0,0,0.1);
+    flex-shrink: 0;
+  }
+  .tab {
+    height: 40px;
+    padding: 0 4px;
+    margin-right: 24px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: #aaa;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -0.5px;
+  }
+  .tab.active {
+    color: #4A9EDB;
+    border-bottom-color: #4A9EDB;
+  }
+
+  .list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px;
+  }
+
+  .entry {
+    padding: 12px 0;
+    border-bottom: 0.5px solid rgba(0,0,0,0.07);
+  }
+  .entry:last-child { border-bottom: none; }
+
+  .entry-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .entry-main { flex: 1; min-width: 0; }
+
+  .entry-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+  }
+  .entry-hanzi {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: #111;
+    line-height: 1.3;
+  }
+  .entry-tr {
+    font-size: 12px;
+    color: #555;
+    line-height: 1.4;
+  }
+
+  .word-rows {
+    margin-top: 7px;
+    padding-left: 10px;
+    border-left: 2px solid rgba(74,158,219,0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .word-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .word-hanzi {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    color: #222;
+    flex-shrink: 0;
+  }
+  .word-pinyin {
+    font-size: 11px;
+    color: #4A9EDB;
+    flex-shrink: 0;
+  }
+  .word-gloss {
+    font-size: 11px;
+    color: #777;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .del-btn {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: none;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.1s;
+    margin-top: 2px;
+  }
+  .del-btn:hover { color: #c0392b; }
+
+  .word-del-btn {
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: none;
+    color: #ddd;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.1s;
+    margin-left: auto;
+  }
+  .word-del-btn:hover { color: #c0392b; }
+
+  .export-btn {
+    margin-left: auto;
+    height: 26px;
+    padding: 0 10px;
+    background: transparent;
+    color: #4A9EDB;
+    border: 0.5px solid rgba(74,158,219,0.5);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .export-btn:hover { background: rgba(74,158,219,0.08); }
+
+  .empty {
+    text-align: center;
+    color: #bbb;
+    font-size: 13px;
+    padding: 48px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-title">Cache</span>
+  <span class="header-count" id="headerCount"></span>
+  <button class="export-btn" id="exportBtn">Export CSV</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="phrases">Phrases</button>
+  <button class="tab" data-tab="words">Words</button>
+</div>
+
+<div class="list" id="list"></div>
+
+<script src="cache.js"></script>
+</body>
+</html>

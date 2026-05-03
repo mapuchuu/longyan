@@ -3,7 +3,7 @@
   "name": "Longyan",
   "version": "2.0",
   "description": "Highlight Chinese text on any page to get word by word pinyin and translations",
-  "permissions": ["storage"],
+  "permissions": ["storage", "windows"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

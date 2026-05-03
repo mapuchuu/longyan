@@ -3,6 +3,7 @@
 
   let popup = null;
   let active = true;
+  let popupSize = 's';
   let debounceTimer = null;
   let scannedNodes = new WeakSet();
   let wordCache = {};
@@ -11,15 +12,17 @@
   let phraseSet = new Set();
 
   // ---------- Init ----------
-  chrome.storage.local.get(['ext_active', 'word_cache', 'phrase_cache'], (d) => {
+  chrome.storage.local.get(['ext_active', 'word_cache', 'phrase_cache', 'popup_size'], (d) => {
     if (d.ext_active === false) active = false;
     wordCache = d.word_cache || {};
     phraseCache = d.phrase_cache || {};
+    popupSize = d.popup_size || 'm';
     rebuildRegex();
   });
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.ext_active) active = changes.ext_active.newValue !== false;
+    if (changes.popup_size) popupSize = changes.popup_size.newValue || 's';
     if (changes.word_cache) {
       wordCache = changes.word_cache.newValue || {};
       rebuildRegex();
@@ -104,6 +107,9 @@
     // Exact match → cache hit, no override
     if (phraseCache[text]) {
       showPhrasePopup(rect, phraseCache[text], true, text);
+      let cacheAnchor = range.commonAncestorContainer;
+      if (cacheAnchor && cacheAnchor.nodeType !== 1) cacheAnchor = cacheAnchor.parentElement;
+      if (cacheAnchor && cacheAnchor.isConnected) scanDeep(cacheAnchor);
       return;
     }
 
@@ -229,14 +235,15 @@
   // ---------- Popups ----------
   function showLoadingPopup(rect) {
     const p = createPopup(rect);
+    p.classList.add('cn-loading');
     p.innerHTML = `
-      <button class="cn-trans-close" title="Close">×</button>
       <div class="cn-trans-loading">
         <span class="cn-trans-loading-dot"></span>
         <span class="cn-trans-loading-dot"></span>
         <span class="cn-trans-loading-dot"></span>
+        <button class="cn-trans-loading-close" title="Cancel">×</button>
       </div>`;
-    p.querySelector('.cn-trans-close').addEventListener('click', removePopup);
+    p.querySelector('.cn-trans-loading-close').addEventListener('click', removePopup);
     finalizePopupPosition(p, rect);
   }
 
@@ -270,6 +277,8 @@
     removePopup();
     popup = document.createElement('div');
     popup.id = 'cn-trans-popup';
+    if (popupSize === 'm') popup.classList.add('cn-size-m');
+    else if (popupSize === 'l') popup.classList.add('cn-size-l');
     popup.style.visibility = 'hidden';
     popup.style.left = '0px';
     popup.style.top = '0px';
@@ -277,23 +286,37 @@
     return popup;
   }
 
+  function getPopupZoom(p) {
+    if (p.classList.contains('cn-size-l')) return 1.67;
+    if (p.classList.contains('cn-size-m')) return 1.33;
+    return 1;
+  }
+
   function finalizePopupPosition(p, rect) {
     const scrollX = window.scrollX;
     const scrollY = window.scrollY;
+    const factor = getPopupZoom(p);
+
+    // getBoundingClientRect gives actual rendered (zoomed) dimensions
+    const bcr = p.getBoundingClientRect();
+    const visualW = bcr.width;
+    const visualH = bcr.height;
+
     let left = rect.left + scrollX;
     let top = rect.bottom + scrollY + 10;
-    const maxLeft = window.innerWidth + scrollX - p.offsetWidth - 8;
+    const maxLeft = window.innerWidth + scrollX - visualW - 8;
     if (left > maxLeft) left = maxLeft;
     if (left < scrollX + 8) left = scrollX + 8;
 
-    const showAbove = rect.bottom + p.offsetHeight + 16 > window.innerHeight;
+    const showAbove = rect.bottom + visualH + 16 > window.innerHeight;
     if (showAbove) {
       p.dataset.above = 'true';
-      top = rect.top + scrollY - p.offsetHeight - 10;
+      top = rect.top + scrollY - visualH - 10;
     }
 
-    p.style.left = left + 'px';
-    p.style.top = top + 'px';
+    // Chrome multiplies style.left/top by the zoom factor, so divide to compensate
+    p.style.left = (left / factor) + 'px';
+    p.style.top = (top / factor) + 'px';
     p.style.visibility = 'visible';
   }
 
@@ -393,8 +416,12 @@
     if (!key) { removePopup(); return; }
     if (type === 'word') {
       delete wordCache[key];
+      if (phraseCache[key]) delete phraseCache[key];
       document.querySelectorAll('.cn-trans-known').forEach(node => {
         if (node.dataset.word === key) unwrapMarker(node);
+      });
+      document.querySelectorAll('.cn-phrase').forEach(node => {
+        if (node.dataset.phraseKey === key) unwrapMarker(node);
       });
     } else if (type === 'phrase') {
       const phraseData = phraseCache[key];

@@ -3,105 +3,128 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    width: 340px;
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background: #12131a;
-    color: #e4e4e8;
-    padding: 20px;
+    width: 300px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    color: #111;
+    padding: 14px;
+    border-radius: 4px;
+  }
+
+  @supports not (backdrop-filter: blur(1px)) {
+    body { background: #fff; }
   }
 
   .header {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 18px;
+    margin-bottom: 12px;
   }
-  .header h1 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-  }
-  .header h1 span { color: #e8533e; }
 
-  label {
+  .logo {
     display: block;
-    font-size: 0.72rem;
-    color: #8b8d9a;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .wordmark {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: #111;
+    line-height: 1;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 10px;
+    color: #888;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
     font-weight: 500;
     margin-bottom: 6px;
   }
 
   input[type="password"] {
     width: 100%;
-    padding: 9px 12px;
-    background: #1a1c25;
-    border: 1px solid #2e3140;
-    border-radius: 7px;
-    color: #e4e4e8;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem;
+    height: 34px;
+    padding: 0 10px;
+    background: #fff;
+    border: 0.5px solid rgba(0,0,0,0.15);
+    border-radius: 3px;
+    color: #111;
+    font-family: monospace;
+    font-size: 12px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.15s;
+    display: block;
   }
-  input:focus { border-color: #e8533e; }
-  input::placeholder { color: #555; }
+  input:focus { border-color: #4A9EDB; }
+  input::placeholder { color: #bbb; }
 
   .save-btn {
-    margin-top: 12px;
+    margin-top: 6px;
     width: 100%;
-    padding: 9px;
-    background: #e8533e;
+    height: 34px;
+    background: #4A9EDB;
     color: #fff;
     border: none;
-    border-radius: 7px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 600;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
     transition: filter 0.15s;
   }
-  .save-btn:hover { filter: brightness(1.1); }
+  .save-btn:hover { filter: brightness(1.08); }
 
   .status {
-    margin-top: 10px;
-    font-size: 0.78rem;
-    text-align: center;
-    min-height: 20px;
-    transition: opacity 0.3s;
+    min-height: 18px;
+    font-size: 11px;
+    color: transparent;
+    margin-top: 5px;
+    transition: color 0.2s;
   }
-  .status.success { color: #5dba7d; }
-  .status.info { color: #8b8d9a; }
+  .status.success { color: #27ae60; }
+  .status.info { color: #888; }
+
+  .divider {
+    height: 0;
+    border-top: 0.5px solid rgba(0,0,0,0.08);
+    margin: 10px 0;
+  }
 
   .toggle-row {
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid #2e3140;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 2px 0;
   }
   .toggle-label {
-    font-size: 0.82rem;
-    font-weight: 500;
+    font-size: 12px;
+    color: #111;
   }
 
   .toggle {
     position: relative;
     width: 40px;
     height: 22px;
+    flex-shrink: 0;
   }
-  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
   .toggle .slider {
     position: absolute;
     inset: 0;
-    background: #2e3140;
+    background: rgba(0,0,0,0.12);
     border-radius: 11px;
     cursor: pointer;
     transition: background 0.2s;
@@ -111,81 +134,79 @@
     position: absolute;
     width: 16px; height: 16px;
     left: 3px; top: 3px;
-    background: #888;
+    background: #aaa;
     border-radius: 50%;
     transition: all 0.2s;
   }
-  .toggle input:checked + .slider { background: #e8533e; }
+  .toggle input:checked + .slider { background: #4A9EDB; }
   .toggle input:checked + .slider::before { transform: translateX(18px); background: #fff; }
 
-  .hint {
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid #2e3140;
-    font-size: 0.75rem;
-    color: #6b6d7a;
-    line-height: 1.6;
-  }
-
-  .cache-section {
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid #2e3140;
-  }
   .cache-stats {
     display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 8px;
   }
   .cache-stat {
     flex: 1;
-    background: #1a1c25;
-    border: 1px solid #2e3140;
-    border-radius: 7px;
-    padding: 8px;
     text-align: center;
+    padding: 6px 4px;
   }
   .cache-stat-num {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #f0c36d;
-    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: #4A9EDB;
+    line-height: 1.1;
   }
   .cache-stat-label {
-    font-size: 0.65rem;
-    color: #6b6d7a;
+    font-size: 9px;
+    color: #888;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
     margin-top: 2px;
   }
+
   .clear-btn {
     width: 100%;
-    padding: 7px;
+    height: 32px;
     background: transparent;
-    color: #8b8d9a;
-    border: 1px solid #2e3140;
-    border-radius: 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.78rem;
+    color: #888;
+    border: 0.5px solid rgba(0,0,0,0.15);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 11px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: color 0.15s, border-color 0.15s;
   }
   .clear-btn:hover {
-    color: #e8533e;
-    border-color: #e8533e;
+    color: #c0392b;
+    border-color: rgba(192,57,43,0.3);
+  }
+
+  .hint {
+    font-size: 10px;
+    color: #999;
+    line-height: 1.6;
+  }
+  .shortcut {
+    font-size: 10px;
+    color: #bbb;
+    margin-top: 6px;
   }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h1>汉字 <span>→</span> English</h1>
+  <img class="logo" src="icons/icon48.png" alt="Longyan">
+  <span class="wordmark">Longyan</span>
 </div>
 
-<label>Anthropic API Key</label>
-<input type="password" id="apiKey" placeholder="sk-ant-api03-..." />
-<button class="save-btn" id="saveBtn">Save Key</button>
+<span class="field-label">Anthropic API Key</span>
+<input type="password" id="apiKey" placeholder="sk-ant-api03-…" />
+<button class="save-btn" id="saveBtn">Save</button>
 <div class="status" id="status"></div>
+
+<div class="divider"></div>
 
 <div class="toggle-row">
   <span class="toggle-label">Active</span>
@@ -195,24 +216,24 @@
   </label>
 </div>
 
-<div class="cache-section">
-  <div class="cache-stats">
-    <div class="cache-stat">
-      <div class="cache-stat-num" id="wordCount">0</div>
-      <div class="cache-stat-label">words</div>
-    </div>
-    <div class="cache-stat">
-      <div class="cache-stat-num" id="phraseCount">0</div>
-      <div class="cache-stat-label">phrases</div>
-    </div>
-  </div>
-  <button class="clear-btn" id="clearBtn">Clear cache</button>
-</div>
+<div class="divider"></div>
 
-<div class="hint">
-  Highlight Chinese text on any page. Translated phrases get a red underline with a tab at the top-left — click the tab to reopen the phrase card. Individual words inside get a yellow highlight — click any word for its card. Gap-severity dots flag words whose meaning doesn't map cleanly to English; click amber or red cards to expand the explanation.<br><br>
-  Ctrl+Shift+T to toggle on/off.
+<div class="cache-stats">
+  <div class="cache-stat">
+    <div class="cache-stat-num" id="wordCount">0</div>
+    <div class="cache-stat-label">Words</div>
+  </div>
+  <div class="cache-stat">
+    <div class="cache-stat-num" id="phraseCount">0</div>
+    <div class="cache-stat-label">Phrases</div>
+  </div>
 </div>
+<button class="clear-btn" id="clearBtn">Clear cache</button>
+
+<div class="divider"></div>
+
+<p class="hint">Highlight Chinese text on any page to get word-by-word pinyin and translations. Click a highlighted word or phrase to reopen its card.</p>
+<p class="shortcut">Ctrl+Shift+T to toggle on/off</p>
 
 <script src="popup.js"></script>
 </body>

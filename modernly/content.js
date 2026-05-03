@@ -66,31 +66,29 @@
 
   document.addEventListener('click', (e) => {
     if (!active) return;
-    const tab = e.target.closest && e.target.closest('.cn-trans-phrase-tab');
-    if (tab) {
-      e.preventDefault();
-      e.stopPropagation();
-      const phraseSpan = tab.closest('.cn-trans-phrase');
-      if (!phraseSpan) return;
-      const key = phraseSpan.dataset.phraseKey;
-      const data = phraseCache[key];
-      if (data) {
-        showPhrasePopup(phraseSpan.getBoundingClientRect(), data, true, key);
-      }
-      return;
-    }
-    const word = e.target.closest && e.target.closest('.cn-trans-word-unit');
+    const word = e.target.closest && e.target.closest('.cn-trans-known');
     if (word) {
       e.preventDefault();
       e.stopPropagation();
       const w = word.dataset.word;
       const data = wordCache[w];
       if (data) showWordPopup(word.getBoundingClientRect(), data);
+      return;
+    }
+    const phrase = e.target.closest && e.target.closest('.cn-phrase');
+    if (phrase) {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = phrase.dataset.phraseKey;
+      const data = phraseCache[key];
+      if (data) {
+        showPhrasePopup(phrase.getBoundingClientRect(), data, true, key);
+      }
     }
   }, true);
 
   function isInteractiveMarker(el) {
-    return el && el.closest && el.closest('.cn-trans-phrase-tab, .cn-trans-word-unit');
+    return el && el.closest && el.closest('.cn-phrase, .cn-trans-known');
   }
 
   function handleSelection() {
@@ -142,7 +140,7 @@
     if (!el || !combinedRegex) return;
     if (el.tagName && /^(SCRIPT|STYLE|TEXTAREA|INPUT|NOSCRIPT)$/.test(el.tagName)) return;
     if (el.id === 'cn-trans-popup') return;
-    if (el.closest && (el.closest('#cn-trans-popup') || el.closest('.cn-trans-phrase') || el.closest('.cn-trans-word-unit'))) return;
+    if (el.closest && (el.closest('#cn-trans-popup') || el.closest('.cn-phrase') || el.closest('.cn-trans-known'))) return;
     if (el.isContentEditable) return;
 
     const textNodes = [];
@@ -180,7 +178,7 @@
       const matched = match[0];
       if (phraseSet.has(matched)) {
         frag.appendChild(buildPhraseNode(matched, phraseCache[matched]));
-      } else if (wordCache[matched]) {
+      } else if (wordCache[matched] && !CONNECTOR_CHARS.has(matched)) {
         frag.appendChild(buildWordNode(matched));
       } else {
         frag.appendChild(document.createTextNode(matched));
@@ -195,28 +193,24 @@
 
   function buildPhraseNode(phraseText, phraseData) {
     const span = document.createElement('span');
-    span.className = 'cn-trans-phrase';
+    span.className = 'cn-phrase';
     span.dataset.phraseKey = phraseText;
 
-    const tab = document.createElement('span');
-    tab.className = 'cn-trans-phrase-tab';
-    tab.title = 'Phrase translation';
-    const tabVisual = document.createElement('span');
-    tabVisual.className = 'cn-trans-phrase-tab-visual';
-    tab.appendChild(tabVisual);
-    span.appendChild(tab);
+    const marker = document.createElement('span');
+    marker.className = 'cn-phrase-marker';
+    span.appendChild(marker);
 
     const words = (phraseData && phraseData.words) || [];
     let cursor = 0;
     for (const w of words) {
-      if (!w || !w.chinese) continue;
-      const idx = phraseText.indexOf(w.chinese, cursor);
+      if (!w || !w.hanzi) continue;
+      const idx = phraseText.indexOf(w.hanzi, cursor);
       if (idx < 0) continue;
       if (idx > cursor) {
         span.appendChild(document.createTextNode(phraseText.slice(cursor, idx)));
       }
-      span.appendChild(buildWordNode(w.chinese));
-      cursor = idx + w.chinese.length;
+      span.appendChild(buildWordNode(w.hanzi));
+      cursor = idx + w.hanzi.length;
     }
     if (cursor < phraseText.length) {
       span.appendChild(document.createTextNode(phraseText.slice(cursor)));
@@ -226,7 +220,7 @@
 
   function buildWordNode(word) {
     const span = document.createElement('span');
-    span.className = 'cn-trans-word-unit';
+    span.className = 'cn-trans-known';
     span.dataset.word = word;
     span.textContent = word;
     return span;
@@ -250,51 +244,26 @@
 
   function showPhrasePopup(rect, data, fromCache, key) {
     const p = createPopup(rect);
-    const words = data.words || [];
-    const isSingle = words.length <= 1;
-
-    if (isSingle) {
-      p.classList.add('cn-trans-popup--single');
-      p.innerHTML = `
-        <button class="cn-trans-close" title="Close">×</button>
-        <button class="cn-trans-trash" title="Delete translation">${TRASH_SVG}</button>
-        <div class="cn-trans-words">${words[0] ? renderWordCard(words[0]) : ''}</div>`;
-    } else {
-      p.classList.add('cn-trans-popup--phrase');
-      const wordsHtml = words.map(renderWordCard).join('');
-      p.innerHTML = `
-        <button class="cn-trans-close" title="Close">×</button>
-        <button class="cn-trans-trash" title="Delete translation">${TRASH_SVG}</button>
-        <div class="cn-trans-full">${esc(data.phraseTranslation || '')}</div>
-        <div class="cn-trans-words">${wordsHtml}</div>`;
-    }
+    p.innerHTML = `
+      <button class="cn-trans-close" title="Close">×</button>
+      <button class="cn-trans-trash" title="Delete translation">${TRASH_SVG}</button>
+      ${buildPopupHTML(data)}`;
     p.querySelector('.cn-trans-close').addEventListener('click', removePopup);
     p.querySelector('.cn-trans-trash').addEventListener('click', () => deleteCachedEntry(key, 'phrase'));
-    bindExpandHandlers(p);
     finalizePopupPosition(p, rect);
   }
 
   function showWordPopup(rect, wordData) {
     const p = createPopup(rect);
-    p.classList.add('cn-trans-popup--single');
-    const key = wordData && wordData.chinese;
+    const key = wordData && wordData.hanzi;
+    const syntheticData = { full_translation: wordData.meaning || '', words: [wordData] };
     p.innerHTML = `
       <button class="cn-trans-close" title="Close">×</button>
       <button class="cn-trans-trash" title="Delete translation">${TRASH_SVG}</button>
-      <div class="cn-trans-words">${renderWordCard(wordData)}</div>`;
+      ${buildPopupHTML(syntheticData, false)}`;
     p.querySelector('.cn-trans-close').addEventListener('click', removePopup);
     p.querySelector('.cn-trans-trash').addEventListener('click', () => deleteCachedEntry(key, 'word'));
-    bindExpandHandlers(p);
     finalizePopupPosition(p, rect);
-  }
-
-  function bindExpandHandlers(p) {
-    p.querySelectorAll('.cn-trans-word-expandable').forEach(card => {
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.cn-trans-close, .cn-trans-trash')) return;
-        card.classList.toggle('expanded');
-      });
-    });
   }
 
   function createPopup(rect) {
@@ -328,24 +297,80 @@
     p.style.visibility = 'visible';
   }
 
-  function renderWordCard(w) {
-    if (!w) return '';
-    const severity = typeof w.gapSeverity === 'number' ? w.gapSeverity : 0;
-    const tone = severity >= 7 ? 'red' : severity >= 4 ? 'amber' : 'green';
-    const expandable = severity >= 4 && w.gapExplanation;
-    return `
-      <div class="cn-trans-word${expandable ? ' cn-trans-word-expandable' : ''}" data-severity="${severity}">
-        <div class="cn-trans-hanzi-row">
-          <span class="cn-trans-hanzi">${esc(w.chinese || '')}</span>
-          <span class="cn-trans-status">
-            <span class="cn-trans-dot cn-trans-dot-${tone}"></span>
-            ${expandable ? '<span class="cn-trans-chevron">▾</span>' : ''}
-          </span>
+  const TONE_COLORS = ['', '#c0392b', '#27ae60', '#2980b9', '#8e44ad', '#888780'];
+  const FUNCTION_CHARS = new Set(['的','了','和','是','在','也','都','就','与','或','但','而','对','于']);
+  const CONNECTOR_CHARS = new Set(['的','了','和','是','在','也','都','就','与','或','但','而','对','于','把','被','让','给','从','到','着','过','吗','呢','吧','啊','嗯','呀']);
+
+  function toneColor(t) {
+    const n = Number(t);
+    if (n === 1) return '#c0392b';
+    if (n === 2) return '#27ae60';
+    if (n === 3) return '#2980b9';
+    if (n === 4) return '#8e44ad';
+    return '#888780';
+  }
+
+  function coloredHanzi(hanzi, tones) {
+    const t = Array.isArray(tones) ? tones : [];
+    return (hanzi || '').split('').map((ch, i) =>
+      `<span style="color:${toneColor(t[i])}">${esc(ch)}</span>`
+    ).join('');
+  }
+
+  function splitPinyinSyllables(s) {
+    const C = 'bpmfdtnlgkhjqxzcsryw';
+    const V = 'aeiouüāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ';
+    const patt = new RegExp(`^[${C}]{0,2}[${V}][${V}]*(?:ng?|n|r)?`);
+    const parts = [];
+    let rem = s.replace(/\s/g, '');
+    while (rem.length > 0) {
+      const m = rem.match(patt);
+      if (m && m[0].length > 0) { parts.push(m[0]); rem = rem.slice(m[0].length); }
+      else { parts.push(rem); break; }
+    }
+    return parts;
+  }
+
+  function coloredPinyin(pinyin, tones) {
+    if (!pinyin) return '';
+    const t = Array.isArray(tones) ? tones : [];
+    let syls = pinyin.trim().split(/\s+/).filter(Boolean);
+    if (t.length > 1 && (syls.length < 2 || syls.length !== t.length)) {
+      const split = splitPinyinSyllables(pinyin);
+      if (split.length === t.length || syls.length < 2) syls = split;
+    }
+    return syls.map((syl, i) =>
+      `<span style="color:${toneColor(t[i])}">${esc(syl)}</span>`
+    ).join('&nbsp;');
+  }
+
+  function buildPopupHTML(data, showHead = true) {
+    const headChars = (data.words || []).map(w => esc(w.hanzi || '')).join('');
+    const rows = (data.words || []).map(w => {
+      const dim = (w.meaning && w.meaning.length < 5) || FUNCTION_CHARS.has(w.hanzi) ? ' cn-dim' : '';
+      let tagHtml = '';
+      if (w.tag === 'lost_in_translation') {
+        tagHtml = `<span class="cn-tag cn-tag-lit">lost in translation</span>`;
+      } else if (w.tag === 'cultural_context') {
+        tagHtml = `<span class="cn-tag cn-tag-cx">cultural context</span>`;
+      }
+      const noteHtml = w.note
+        ? `<div class="cn-note-wrap"><div class="cn-note-inner"><div class="cn-note">${esc(w.note)}</div></div></div>`
+        : '';
+      return `<div class="cn-row${dim}">
+        <div class="cn-wl">
+          <span class="cn-ch">${coloredHanzi(w.hanzi || '', w.tones)}</span>
+          <span class="cn-pi">${coloredPinyin(w.pinyin, w.tones)}</span>
         </div>
-        <span class="cn-trans-pinyin">${esc(w.pinyin || '')}</span>
-        <span class="cn-trans-meaning">${esc(w.translation || '')}</span>
-        ${expandable ? `<div class="cn-trans-gap-wrap"><div class="cn-trans-gap-divider"></div><div class="cn-trans-gap-explanation">${esc(w.gapExplanation)}</div></div>` : ''}
+        <div class="cn-gl">${esc(w.meaning || '')}${tagHtml}</div>
+        ${noteHtml}
       </div>`;
+    }).join('');
+    const headHTML = showHead ? `<div class="cn-head">
+      <span class="cn-head-chars">${headChars}</span>
+      <span class="cn-head-tr">${esc(data.full_translation || '')}</span>
+    </div>` : '';
+    return `${headHTML}<div class="cn-rows">${rows}</div>`;
   }
 
   // ---------- Cache + DOM mutation helpers ----------
@@ -358,7 +383,7 @@
     for (const phData of Object.values(phraseCache)) {
       if (!phData || !phData.words) continue;
       for (const w of phData.words) {
-        if (w && w.chinese === word) return true;
+        if (w && w.hanzi === word) return true;
       }
     }
     return false;
@@ -368,7 +393,7 @@
     if (!key) { removePopup(); return; }
     if (type === 'word') {
       delete wordCache[key];
-      document.querySelectorAll('.cn-trans-word-unit').forEach(node => {
+      document.querySelectorAll('.cn-trans-known').forEach(node => {
         if (node.dataset.word === key) unwrapMarker(node);
       });
     } else if (type === 'phrase') {
@@ -376,15 +401,15 @@
       delete phraseCache[key];
       if (phraseData && phraseData.words) {
         for (const w of phraseData.words) {
-          if (w && w.chinese && !isWordInAnyPhrase(w.chinese)) {
-            delete wordCache[w.chinese];
+          if (w && w.hanzi && !isWordInAnyPhrase(w.hanzi)) {
+            delete wordCache[w.hanzi];
           }
         }
       }
-      document.querySelectorAll('.cn-trans-phrase').forEach(node => {
+      document.querySelectorAll('.cn-phrase').forEach(node => {
         if (node.dataset.phraseKey === key) unwrapMarker(node);
       });
-      document.querySelectorAll('.cn-trans-word-unit').forEach(node => {
+      document.querySelectorAll('.cn-trans-known').forEach(node => {
         if (!wordCache[node.dataset.word]) unwrapMarker(node);
       });
     }
@@ -395,8 +420,8 @@
   }
 
   function clearOverlappingCaches(range) {
-    const phrases = document.querySelectorAll('.cn-trans-phrase');
-    const wordUnits = document.querySelectorAll('.cn-trans-word-unit');
+    const phrases = document.querySelectorAll('.cn-phrase');
+    const wordUnits = document.querySelectorAll('.cn-trans-known');
 
     const phraseKeys = new Set();
     const wordKeys = new Set();
@@ -414,7 +439,7 @@
       delete phraseCache[k];
       if (phData && phData.words) {
         for (const w of phData.words) {
-          if (w && w.chinese) wordKeys.add(w.chinese);
+          if (w && w.hanzi) wordKeys.add(w.hanzi);
         }
       }
     }
@@ -444,6 +469,8 @@
         return;
       }
 
+      const systemPrompt = `For each word, analyze whether the English translation loses meaningful nuance from the Chinese. Set tag to 'lost_in_translation' if the English word genuinely cannot carry the full meaning or register of the Chinese (e.g. 掠夺 → 'plunder' loses the implied organized violence). Set tag to 'cultural_context' if understanding the word requires knowledge specific to Chinese history, politics, or culture (e.g. 农民起义 is a Marxist historiographic category, not a neutral descriptor). Set tag to null for everything else. Do not over-tag — most words should be null.`;
+
       const prompt = `You are translating Chinese text in context.
 
 Highlighted text: ${text}
@@ -451,17 +478,20 @@ Surrounding context for comprehension: ${context.before}【${text}】${context.a
 
 Return JSON:
 {
-  "phraseTranslation": "English translation of ONLY the highlighted text, not the surrounding context",
+  "full_translation": "English translation of ONLY the highlighted text, not the surrounding context",
   "words": [
     {
-      "chinese": "word or phrase unit",
+      "hanzi": "word or phrase unit",
       "pinyin": "tone-marked pinyin",
-      "translation": "direct English equivalent",
-      "gapSeverity": integer 0-10,
-      "gapExplanation": "if gapSeverity >= 4, one sentence under 100 characters. Otherwise null"
+      "tones": [4, 2],
+      "meaning": "direct English equivalent",
+      "tag": "lost_in_translation",
+      "note": "single sentence, non-null only when tag is non-null"
     }
   ]
 }
+
+tones is an array of integers (1–5), one per syllable, matching the syllable count of pinyin. Tone 5 means neutral/unstressed.
 
 Break the highlighted text into meaningful word units, not character-by-character. Single characters that function as particles or grammatical markers should be separate units.
 
@@ -480,6 +510,7 @@ Respond ONLY with JSON. No markdown, no backticks, no preamble.`;
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 1024,
+          system: systemPrompt,
           messages: [{ role: 'user', content: prompt }]
         })
       });
@@ -510,20 +541,21 @@ Respond ONLY with JSON. No markdown, no backticks, no preamble.`;
     const pc = stored.phrase_cache || {};
 
     pc[phrase] = {
-      phraseTranslation: parsed.phraseTranslation,
+      full_translation: parsed.full_translation,
       words: parsed.words || [],
       context,
       timestamp: Date.now()
     };
 
     for (const w of (parsed.words || [])) {
-      if (w && w.chinese && CJK.test(w.chinese)) {
-        wc[w.chinese] = {
-          chinese: w.chinese,
-          pinyin: w.pinyin,
-          translation: w.translation,
-          gapSeverity: typeof w.gapSeverity === 'number' ? w.gapSeverity : 0,
-          gapExplanation: w.gapExplanation || null,
+      if (w && w.hanzi && CJK.test(w.hanzi) && !CONNECTOR_CHARS.has(w.hanzi)) {
+        wc[w.hanzi] = {
+          hanzi: w.hanzi,
+          pinyin: w.pinyin || '',
+          tones: w.tones || [],
+          meaning: w.meaning || '',
+          tag: w.tag || null,
+          note: w.note || null,
           context: phrase,
           timestamp: Date.now()
         };

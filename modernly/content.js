@@ -236,14 +236,7 @@
   function showLoadingPopup(rect) {
     const p = createPopup(rect);
     p.classList.add('cn-loading');
-    p.innerHTML = `
-      <div class="cn-trans-loading">
-        <span class="cn-trans-loading-dot"></span>
-        <span class="cn-trans-loading-dot"></span>
-        <span class="cn-trans-loading-dot"></span>
-        <button class="cn-trans-loading-close" title="Cancel">×</button>
-      </div>`;
-    p.querySelector('.cn-trans-loading-close').addEventListener('click', removePopup);
+    p.innerHTML = `<img class="cn-loading-logo" src="${chrome.runtime.getURL('icons/icon48.png')}" alt="">`;
     finalizePopupPosition(p, rect);
   }
 
@@ -354,10 +347,14 @@
     return parts;
   }
 
-  function coloredPinyin(pinyin, tones) {
+  function coloredPinyin(pinyin, tones, hanziLen) {
     if (!pinyin) return '';
     const t = Array.isArray(tones) ? tones : [];
-    let syls = pinyin.trim().split(/\s+/).filter(Boolean);
+    const syllables = pinyin.normalize('NFC').split(' ').filter(Boolean);
+    if (hanziLen != null && syllables.length !== hanziLen) {
+      return `<span style="color:#888780">${esc(pinyin)}</span>`;
+    }
+    let syls = syllables.length ? syllables : pinyin.trim().split(/\s+/).filter(Boolean);
     if (t.length > 1 && (syls.length < 2 || syls.length !== t.length)) {
       const split = splitPinyinSyllables(pinyin);
       if (split.length === t.length || syls.length < 2) syls = split;
@@ -383,7 +380,7 @@
       return `<div class="cn-row${dim}">
         <div class="cn-wl">
           <span class="cn-ch">${coloredHanzi(w.hanzi || '', w.tones)}</span>
-          <span class="cn-pi">${coloredPinyin(w.pinyin, w.tones)}</span>
+          <span class="cn-pi">${coloredPinyin(w.pinyin, w.tones, (w.hanzi || '').length)}</span>
         </div>
         <div class="cn-gl">${esc(w.meaning || '')}${tagHtml}</div>
         ${noteHtml}
@@ -496,7 +493,7 @@
         return;
       }
 
-      const systemPrompt = `For each word, analyze whether the English translation loses meaningful nuance from the Chinese. Set tag to 'lost_in_translation' if the English word genuinely cannot carry the full meaning or register of the Chinese (e.g. 掠夺 → 'plunder' loses the implied organized violence). Set tag to 'cultural_context' if understanding the word requires knowledge specific to Chinese history, politics, or culture (e.g. 农民起义 is a Marxist historiographic category, not a neutral descriptor). Set tag to null for everything else. Do not over-tag — most words should be null.`;
+      const systemPrompt = `For each word, analyze whether the English translation loses meaningful nuance from the Chinese. Set tag to 'lost_in_translation' if the English word genuinely cannot carry the full meaning or register of the Chinese (e.g. 掠夺 → 'plunder' loses the implied organized violence). Set tag to 'cultural_context' if understanding the word requires knowledge specific to Chinese history, politics, or culture (e.g. 农民起义 is a Marxist historiographic category, not a neutral descriptor). Set tag to null for everything else. Do not over-tag — most words should be null. Pinyin must always be returned with exactly one space between each syllable. Every syllable is one consonant cluster plus one vowel (with tone mark). Never concatenate syllables. Never omit spaces. Example: 铜钱 must be tóng qián not tóngqián. Example: 方孔 must be fāng kǒng not fāngkǒng. The number of space-separated syllables must exactly equal the number of characters in the hanzi string.`;
 
       const prompt = `You are translating Chinese text in context.
 

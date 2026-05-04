@@ -3,12 +3,23 @@ const saveBtn = document.getElementById('saveBtn');
 const status = document.getElementById('status');
 const activeToggle = document.getElementById('activeToggle');
 
+let statusTimer = null;
+function showStatus(text, type) {
+  clearTimeout(statusTimer);
+  status.textContent = text;
+  status.className = 'status ' + type;
+  status.style.opacity = '1';
+  status.style.display = 'inline';
+  statusTimer = setTimeout(() => {
+    status.style.opacity = '0';
+    status.addEventListener('transitionend', () => {
+      status.style.display = 'none';
+    }, { once: true });
+  }, 2000);
+}
+
 chrome.storage.local.get(['anthropic_key', 'ext_active', 'popup_size'], (data) => {
-  if (data.anthropic_key) {
-    keyInput.value = data.anthropic_key;
-    status.textContent = 'Key saved ✓';
-    status.className = 'status success';
-  }
+  if (data.anthropic_key) keyInput.value = data.anthropic_key;
   if (data.ext_active === false) activeToggle.checked = false;
   const size = data.popup_size || 'm';
   document.querySelectorAll('.size-opt').forEach(btn => {
@@ -18,15 +29,8 @@ chrome.storage.local.get(['anthropic_key', 'ext_active', 'popup_size'], (data) =
 
 saveBtn.addEventListener('click', () => {
   const key = keyInput.value.trim();
-  if (!key) {
-    status.textContent = 'Enter a key first';
-    status.className = 'status info';
-    return;
-  }
-  chrome.storage.local.set({ anthropic_key: key }, () => {
-    status.textContent = 'Key saved ✓';
-    status.className = 'status success';
-  });
+  if (!key) { showStatus('Enter a key first', 'info'); return; }
+  chrome.storage.local.set({ anthropic_key: key }, () => showStatus('Key saved ✓', 'success'));
 });
 
 activeToggle.addEventListener('change', () => {

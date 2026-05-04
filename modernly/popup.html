@@ -54,45 +54,49 @@
     margin-bottom: 6px;
   }
 
+  .api-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   input[type="password"] {
-    width: 100%;
-    height: 34px;
-    padding: 0 10px;
-    background: #fff;
-    border: 0.5px solid rgba(0,0,0,0.15);
-    border-radius: 3px;
+    flex: 1;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(0,0,0,0.15);
+    border-radius: 0;
     color: #111;
     font-family: monospace;
     font-size: 12px;
     outline: none;
     transition: border-color 0.15s;
-    display: block;
   }
-  input:focus { border-color: #4A9EDB; }
+  input:focus { border-bottom-color: #4A9EDB; }
   input::placeholder { color: #bbb; }
 
   .save-btn {
-    margin-top: 6px;
-    width: 100%;
-    height: 34px;
-    background: #4A9EDB;
-    color: #fff;
+    background: none;
     border: none;
-    border-radius: 3px;
+    color: #4A9EDB;
+    font-size: 11px;
     font-family: inherit;
-    font-size: 12px;
-    font-weight: 500;
     cursor: pointer;
-    transition: filter 0.15s;
+    padding: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
-  .save-btn:hover { filter: brightness(1.08); }
+  .save-btn:hover { opacity: 0.7; }
 
   .status {
-    min-height: 18px;
+    display: none;
     font-size: 11px;
-    color: transparent;
-    margin-top: 5px;
-    transition: color 0.2s;
+    margin-left: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: opacity 0.4s ease;
   }
   .status.success { color: #27ae60; }
   .status.info { color: #888; }
@@ -211,21 +215,17 @@
   }
 
   .clear-btn {
-    width: 100%;
-    height: 32px;
-    background: transparent;
-    color: #888;
-    border: 0.5px solid rgba(0,0,0,0.15);
-    border-radius: 3px;
-    font-family: inherit;
+    background: none;
+    border: none;
+    color: #aaa;
     font-size: 11px;
+    font-family: inherit;
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    padding: 4px 0;
+    display: block;
+    transition: color 0.15s;
   }
-  .clear-btn:hover {
-    color: #c0392b;
-    border-color: rgba(192,57,43,0.3);
-  }
+  .clear-btn:hover { color: #e74c3c; }
 
   .hint {
     font-size: 10px;
@@ -247,9 +247,11 @@
 </div>
 
 <span class="field-label">Anthropic API Key</span>
-<input type="password" id="apiKey" placeholder="sk-ant-api03-…" />
-<button class="save-btn" id="saveBtn">Save</button>
-<div class="status" id="status"></div>
+<div class="api-row">
+  <input type="password" id="apiKey" placeholder="sk-ant-api03-…" />
+  <button class="save-btn" id="saveBtn">Save</button>
+  <span class="status" id="status"></span>
+</div>
 
 <div class="divider"></div>
 

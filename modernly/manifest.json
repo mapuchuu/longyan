@@ -26,5 +26,11 @@
   ],
   "host_permissions": [
     "https://api.anthropic.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

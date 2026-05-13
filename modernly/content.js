@@ -58,7 +58,10 @@
   document.addEventListener('mouseup', (e) => {
     if (!active) return;
     if (popup && popup.contains(e.target)) return;
-    if (isInteractiveMarker(e.target)) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) {
+      if (isInteractiveMarker(e.target)) return;
+    }
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => handleSelection(), 150);
   });
@@ -107,15 +110,14 @@
     // Exact match → cache hit, no override
     if (phraseCache[text]) {
       showPhrasePopup(rect, phraseCache[text], true, text);
-      let cacheAnchor = range.commonAncestorContainer;
-      if (cacheAnchor && cacheAnchor.nodeType !== 1) cacheAnchor = cacheAnchor.parentElement;
+      const cacheAnchor = resolveAnchor(range);
       if (cacheAnchor && cacheAnchor.isConnected) scanDeep(cacheAnchor);
       return;
     }
 
-    // Capture anchor before any DOM mutation from overlap clearance
-    let anchor = range.commonAncestorContainer;
-    if (anchor && anchor.nodeType !== 1) anchor = anchor.parentElement;
+    // Capture anchor before any DOM mutation from overlap clearance.
+    // Climb past any wrapper spans so the anchor survives unwrap.
+    const anchor = resolveAnchor(range);
 
     clearOverlappingCaches(range);
 
@@ -123,9 +125,29 @@
     translate(text, context, rect, anchor);
   }
 
+  function resolveAnchor(range) {
+    let node = range.commonAncestorContainer;
+    if (node && node.nodeType !== 1) node = node.parentElement;
+    while (
+      node && node.classList &&
+      (node.classList.contains('cn-trans-known') ||
+       node.classList.contains('cn-phrase') ||
+       node.classList.contains('cn-phrase-marker'))
+    ) {
+      node = node.parentElement;
+    }
+    return node;
+  }
+
   function extractContext(range, selectedText) {
     let node = range.startContainer;
     while (node && node.nodeType !== 1) node = node.parentNode;
+    while (
+      node && node.classList &&
+      (node.classList.contains('cn-trans-known') || node.classList.contains('cn-phrase'))
+    ) {
+      node = node.parentElement;
+    }
     if (!node) return { before: '', after: '' };
     const txt = (node.textContent || '').replace(/\s+/g, ' ');
     if (!txt) return { before: '', after: '' };
@@ -396,7 +418,9 @@
   // ---------- Cache + DOM mutation helpers ----------
   function unwrapMarker(node) {
     if (!node || !node.isConnected || !node.parentNode) return;
-    node.parentNode.replaceChild(document.createTextNode(node.textContent), node);
+    const parent = node.parentNode;
+    parent.replaceChild(document.createTextNode(node.textContent), node);
+    if (parent.normalize) parent.normalize();
   }
 
   function isWordInAnyPhrase(word) {

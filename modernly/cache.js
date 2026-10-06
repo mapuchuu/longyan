@@ -11,6 +11,14 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+// Cache writes go through the service worker (background.js); re-render after each.
+function sendToWorker(message) {
+  chrome.runtime.sendMessage(message, (resp) => {
+    if (!resp || !resp.ok) console.warn('Longyan: cache update failed', resp && resp.error);
+    render();
+  });
+}
+
 function esc(s) {
   const d = document.createElement('span');
   d.textContent = s == null ? '' : String(s);
@@ -63,34 +71,13 @@ function render() {
           </div>`;
 
         div.querySelector('.del-btn').addEventListener('click', () => {
-          const phData = phraseCache[key];
-          delete phraseCache[key];
-          if (phData && phData.words) {
-            phData.words.forEach(w => {
-              if (!w || !w.hanzi) return;
-              const usedElsewhere = Object.values(phraseCache).some(p =>
-                p.words && p.words.some(pw => pw && pw.hanzi === w.hanzi)
-              );
-              if (!usedElsewhere) delete wordCache[w.hanzi];
-            });
-          }
-          chrome.storage.local.set({ phrase_cache: phraseCache, word_cache: wordCache }, render);
+          sendToWorker({ type: 'deletePhrase', key });
         });
 
         div.querySelectorAll('.word-del-btn').forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const wi = parseInt(btn.dataset.wi);
-            const words = phraseCache[key].words || [];
-            const removed = words[wi];
-            phraseCache[key].words = words.filter((_, i) => i !== wi);
-            if (removed && removed.hanzi) {
-              const usedElsewhere = Object.values(phraseCache).some(p =>
-                p.words && p.words.some(pw => pw && pw.hanzi === removed.hanzi)
-              );
-              if (!usedElsewhere) delete wordCache[removed.hanzi];
-            }
-            chrome.storage.local.set({ phrase_cache: phraseCache, word_cache: wordCache }, render);
+            sendToWorker({ type: 'removeWordFromPhrase', key, index: parseInt(btn.dataset.wi) });
           });
         });
 
@@ -108,8 +95,7 @@ function render() {
           </div>`;
 
         div.querySelector('.del-btn').addEventListener('click', () => {
-          delete wordCache[key];
-          chrome.storage.local.set({ word_cache: wordCache }, render);
+          sendToWorker({ type: 'deleteWord', key, alsoPhrase: false });
         });
       }
 

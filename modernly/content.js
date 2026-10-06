@@ -115,14 +115,14 @@
       return;
     }
 
-    // Capture anchor before any DOM mutation from overlap clearance.
     // Climb past any wrapper spans so the anchor survives unwrap.
     const anchor = resolveAnchor(range);
 
-    clearOverlappingCaches(range);
+    // Only record the overlap here; nothing is removed unless the translation succeeds.
+    const overlap = collectOverlap(range);
 
     showLoadingPopup(rect);
-    translate(text, context, rect, anchor);
+    translate(text, context, rect, anchor, overlap);
   }
 
   function resolveAnchor(range) {
@@ -423,198 +423,79 @@
     if (parent.normalize) parent.normalize();
   }
 
-  function isWordInAnyPhrase(word) {
-    for (const phData of Object.values(phraseCache)) {
-      if (!phData || !phData.words) continue;
-      for (const w of phData.words) {
-        if (w && w.hanzi === word) return true;
-      }
-    }
-    return false;
+  // All cache writes go through the service worker (background.js).
+  async function sendToWorker(message) {
+    const resp = await chrome.runtime.sendMessage(message);
+    if (!resp || !resp.ok) throw new Error((resp && resp.error) || 'Longyan background worker did not respond');
+    return resp;
   }
 
-  function deleteCachedEntry(key, type) {
-    if (!key) { removePopup(); return; }
-    if (type === 'word') {
-      delete wordCache[key];
-      if (phraseCache[key]) delete phraseCache[key];
-      document.querySelectorAll('.cn-trans-known').forEach(node => {
-        if (node.dataset.word === key) unwrapMarker(node);
-      });
-      document.querySelectorAll('.cn-phrase').forEach(node => {
-        if (node.dataset.phraseKey === key) unwrapMarker(node);
-      });
-    } else if (type === 'phrase') {
-      const phraseData = phraseCache[key];
-      delete phraseCache[key];
-      if (phraseData && phraseData.words) {
-        for (const w of phraseData.words) {
-          if (w && w.hanzi && !isWordInAnyPhrase(w.hanzi)) {
-            delete wordCache[w.hanzi];
-          }
-        }
-      }
-      document.querySelectorAll('.cn-phrase').forEach(node => {
-        if (node.dataset.phraseKey === key) unwrapMarker(node);
-      });
-      document.querySelectorAll('.cn-trans-known').forEach(node => {
-        if (!wordCache[node.dataset.word]) unwrapMarker(node);
-      });
-    }
-    chrome.storage.local.set({ word_cache: wordCache, phrase_cache: phraseCache });
+  // Adopt the worker's caches and unwrap any marker whose entry is gone.
+  function applyCaches(resp, extraNodes = []) {
+    wordCache = resp.wordCache || {};
+    phraseCache = resp.phraseCache || {};
+    for (const node of extraNodes) unwrapMarker(node);
+    document.querySelectorAll('.cn-phrase').forEach(node => {
+      if (!phraseCache[node.dataset.phraseKey]) unwrapMarker(node);
+    });
+    document.querySelectorAll('.cn-trans-known').forEach(node => {
+      if (!wordCache[node.dataset.word]) unwrapMarker(node);
+    });
     rebuildRegex();
     scannedNodes = new WeakSet();
-    removePopup();
   }
 
-  function clearOverlappingCaches(range) {
-    const phrases = document.querySelectorAll('.cn-phrase');
-    const wordUnits = document.querySelectorAll('.cn-trans-known');
+  async function deleteCachedEntry(key, type) {
+    removePopup();
+    if (!key) return;
+    try {
+      const resp = type === 'word'
+        ? await sendToWorker({ type: 'deleteWord', key, alsoPhrase: true })
+        : await sendToWorker({ type: 'deletePhrase', key });
+      applyCaches(resp);
+    } catch (err) {
+      console.warn('Longyan: delete failed', err);
+    }
+  }
 
+  // Which cached entries the selection overlaps. Read-only: the worker applies
+  // the removal together with the new translation, and only if it succeeds.
+  function collectOverlap(range) {
     const phraseKeys = new Set();
     const wordKeys = new Set();
-
-    for (const ph of phrases) {
-      try { if (range.intersectsNode(ph) && ph.dataset.phraseKey) phraseKeys.add(ph.dataset.phraseKey); } catch (_) {}
+    const nodes = [];
+    for (const ph of document.querySelectorAll('.cn-phrase')) {
+      try {
+        if (range.intersectsNode(ph) && ph.dataset.phraseKey) { phraseKeys.add(ph.dataset.phraseKey); nodes.push(ph); }
+      } catch (_) {}
     }
-    for (const wu of wordUnits) {
-      try { if (range.intersectsNode(wu) && wu.dataset.word) wordKeys.add(wu.dataset.word); } catch (_) {}
+    for (const wu of document.querySelectorAll('.cn-trans-known')) {
+      try {
+        if (range.intersectsNode(wu) && wu.dataset.word) { wordKeys.add(wu.dataset.word); nodes.push(wu); }
+      } catch (_) {}
     }
-    if (phraseKeys.size === 0 && wordKeys.size === 0) return;
-
-    for (const k of phraseKeys) {
-      const phData = phraseCache[k];
-      delete phraseCache[k];
-      if (phData && phData.words) {
-        for (const w of phData.words) {
-          if (w && w.hanzi) wordKeys.add(w.hanzi);
-        }
-      }
-    }
-    for (const k of wordKeys) {
-      if (!isWordInAnyPhrase(k)) delete wordCache[k];
-    }
-
-    for (const ph of phrases) {
-      if (phraseKeys.has(ph.dataset.phraseKey)) unwrapMarker(ph);
-    }
-    for (const wu of wordUnits) {
-      if (!wordCache[wu.dataset.word]) unwrapMarker(wu);
-    }
-
-    chrome.storage.local.set({ word_cache: wordCache, phrase_cache: phraseCache });
-    rebuildRegex();
-    scannedNodes = new WeakSet();
+    return { phraseKeys: [...phraseKeys], wordKeys: [...wordKeys], nodes };
   }
 
-  // ---------- API ----------
-  async function translate(text, context, rect, anchor) {
+  // ---------- API (runs in background.js) ----------
+  async function translate(text, context, rect, anchor, overlap) {
     try {
-      const stored = await chrome.storage.local.get(['anthropic_key']);
-      const key = stored.anthropic_key;
-      if (!key) {
-        showError('No API key set. Click the extension icon to add your Anthropic key.');
-        return;
-      }
-
-      const systemPrompt = `For each word, analyze whether the English translation loses meaningful nuance from the Chinese. Set tag to 'lost_in_translation' if the English word cannot carry the full meaning or register of the Chinese (e.g. 掠夺 → 'plunder' loses the implied organized violence). (e.g. 有识之士 The gap you actually want to show is that 有识之士 implies moral obligation, not just intelligence. A "visionary intellectual" in English is a compliment. 有识之士 is almost a calling — if you see clearly, you are duty-bound to speak.)Set tag to 'cultural_context' if understanding the word requires knowledge specific to Chinese history, politics, or culture (e.g. 农民起义 is a Marxist historiographic category, not a neutral descriptor). Set tag to null for everything else. Do not over-tag — most words should be null. When tag is non-null, write the note field as two parts: (1) a one-line dictionary definition of the word in plain English; (2) a 1 sentence scenario or feeling that shows what a native speaker actually experiences when they use this word — written in plain English, present tense, first or second person. If the word carries a physical or emotional sensation, lead with that, in a way that captures the semantic gap. Write like you're a knowledgeable friend whispering context, not a historian citing sources. Max 2 sentences. No words like 'historiographic,' 'invokes,' or 'refers to.' Don't explain what the word does — explain what it means to someone who grew up with it." The goal is something like: "This isn't just 'isolationism' — it's a word Chinese people use when they're still a little embarrassed about what that era cost them." That's the register you want.No em-dashes. Absolutely No meta-commentary about translation, language, or cultural gaps. Pinyin must always be returned with exactly one space between each syllable. Every syllable is one consonant cluster plus one vowel (with tone mark). Never concatenate syllables. Never omit spaces. Example: 铜钱 must be tóng qián not tóngqián. Example: 方孔 must be fāng kǒng not fāngkǒng. The number of space-separated syllables must exactly equal the number of characters in the hanzi string.`;
-
-      const prompt = `You are translating Chinese text in context.
-
-Highlighted text: ${text}
-Surrounding context for comprehension: ${context.before}【${text}】${context.after}
-
-Return JSON:
-{
-  "full_translation": "English translation of ONLY the highlighted text, not the surrounding context",
-  "words": [
-    {
-      "hanzi": "word or phrase unit",
-      "pinyin": "tone-marked pinyin",
-      "tones": [4, 2],
-      "meaning": "direct English equivalent",
-      "tag": "lost_in_translation",
-      "note": "dictionary definition + native-speaker scenario, non-null only when tag is non-null"
-    }
-  ]
-}
-
-tones is an array of integers (1–5), one per syllable, matching the syllable count of pinyin. Tone 5 means neutral/unstressed.
-
-Break the highlighted text into meaningful word units, not character-by-character. Single characters that function as particles or grammatical markers should be separate units.
-
-Use surrounding context to disambiguate meaning but do not translate the context itself.
-
-Respond ONLY with JSON. No markdown, no backticks, no preamble.`;
-
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: prompt }]
-        })
+      const resp = await sendToWorker({
+        type: 'translate',
+        text,
+        context,
+        overlap: { phraseKeys: overlap.phraseKeys, wordKeys: overlap.wordKeys }
       });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error?.message || `API ${resp.status}`);
-      }
-
-      const result = await resp.json();
-      const raw = result.content.map(b => b.text || '').join('');
-      const cleaned = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-
-      await saveToCache(text, context, parsed);
-      showPhrasePopup(rect, parsed, false, text);
+      // Unwrap the overlapped markers so the new phrase can be wrapped whole.
+      applyCaches(resp, overlap.nodes);
+      showPhrasePopup(rect, resp.parsed, false, text);
 
       // Wrap the newly-translated phrase wherever it appears in the source element
       if (anchor && anchor.isConnected) scanDeep(anchor);
     } catch (err) {
       showError(err.message);
     }
-  }
-
-  async function saveToCache(phrase, context, parsed) {
-    const stored = await chrome.storage.local.get(['word_cache', 'phrase_cache']);
-    const wc = stored.word_cache || {};
-    const pc = stored.phrase_cache || {};
-
-    pc[phrase] = {
-      full_translation: parsed.full_translation,
-      words: parsed.words || [],
-      context,
-      timestamp: Date.now()
-    };
-
-    for (const w of (parsed.words || [])) {
-      if (w && w.hanzi && CJK.test(w.hanzi) && !CONNECTOR_CHARS.has(w.hanzi)) {
-        wc[w.hanzi] = {
-          hanzi: w.hanzi,
-          pinyin: w.pinyin || '',
-          tones: w.tones || [],
-          meaning: w.meaning || '',
-          tag: w.tag || null,
-          note: w.note || null,
-          context: phrase,
-          timestamp: Date.now()
-        };
-      }
-    }
-
-    await chrome.storage.local.set({ word_cache: wc, phrase_cache: pc });
-    wordCache = wc;
-    phraseCache = pc;
-    rebuildRegex();
-    scannedNodes = new WeakSet();
   }
 
   function showError(msg) {

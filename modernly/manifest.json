@@ -4,6 +4,9 @@
   "version": "1.0",
   "description": "Read Chinese anywhere. Understand what it actually means.",
   "permissions": ["storage", "windows"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

@@ -60,7 +60,7 @@ refreshStats();
 
 clearBtn.addEventListener('click', () => {
   if (confirm('Clear all cached words and phrases? This cannot be undone.')) {
-    chrome.storage.local.set({ word_cache: {}, phrase_cache: {} }, refreshStats);
+    chrome.runtime.sendMessage({ type: 'clearAll' }, refreshStats);
   }
 });
 
